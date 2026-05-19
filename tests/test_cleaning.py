@@ -934,6 +934,48 @@ class TestParseBoolStrings:
         with pytest.raises(ValueError):
             ar.parse_bool_strings(frame, subset=["missing"])
 
+    def test_parse_bool_strings_non_string_true_values_raises(self):
+        """Regression: non-string items in true_values must raise TypeError,
+        not crash with AttributeError on .strip().lower()."""
+        import pandas as pd
+
+        df = pd.DataFrame({"active": ["yes", "no"]}, dtype=object)
+        frame = ar.from_pandas(df)
+
+        with pytest.raises(TypeError, match="true_values must contain only strings"):
+            ar.parse_bool_strings(frame, true_values={1, "yes"})
+
+    def test_parse_bool_strings_non_string_false_values_raises(self):
+        """Regression: non-string items in false_values must raise TypeError,
+        not crash with AttributeError on .strip().lower()."""
+        import pandas as pd
+
+        df = pd.DataFrame({"active": ["yes", "no"]}, dtype=object)
+        frame = ar.from_pandas(df)
+
+        with pytest.raises(TypeError, match="false_values must contain only strings"):
+            ar.parse_bool_strings(frame, false_values={0, "no"})
+
+    def test_parse_bool_strings_none_in_custom_values_raises(self):
+        """Regression: None in true_values/false_values must raise TypeError."""
+        import pandas as pd
+
+        df = pd.DataFrame({"active": ["yes", "no"]}, dtype=object)
+        frame = ar.from_pandas(df)
+
+        with pytest.raises(TypeError, match="true_values must contain only strings"):
+            ar.parse_bool_strings(frame, true_values={"yes", None})
+
+    def test_parse_bool_strings_bool_in_custom_values_raises(self):
+        """Regression: bool items in true_values must raise TypeError."""
+        import pandas as pd
+
+        df = pd.DataFrame({"active": ["yes", "no"]}, dtype=object)
+        frame = ar.from_pandas(df)
+
+        with pytest.raises(TypeError, match="true_values must contain only strings"):
+            ar.parse_bool_strings(frame, true_values={True, "yes"})
+
 
 class TestRenameColumns:
     def test_rename(self, sample_csv):
