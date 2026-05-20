@@ -13,7 +13,13 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from typing import cast
 
-from ._core import _CsvChunkReader, _CsvConfig, _CsvReader, _CsvWriteConfig, _CsvWriter
+from ._core import (  # type: ignore
+    _CsvChunkReader,
+    _CsvConfig,
+    _CsvReader,
+    _CsvWriteConfig,
+    _CsvWriter,
+)
 from .exceptions import CsvReadError, JsonlReadError
 from .frame import ArFrame
 
