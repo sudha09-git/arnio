@@ -11,7 +11,7 @@ import warnings
 from dataclasses import dataclass
 from threading import Lock
 from time import perf_counter
-from typing import Any, Callable
+from typing import Any, Callable, Union
 
 import pandas as pd
 
@@ -20,12 +20,16 @@ from .convert import from_pandas, to_pandas
 from .exceptions import PipelineStepError, UnknownStepError
 from .frame import ArFrame
 
+# Type aliases for pipeline step specifications
+StepCallable = Callable[..., Any]
+StepSpec = Union[tuple[str], tuple[str, dict[str, Any]]]
+
 logger = logging.getLogger("arnio")
 _BUILTIN_STEP_NAMESPACE = "builtin"
 _STEP_NAMESPACE_SEPARATOR = ":"
 
 # Map step names to cleaning functions
-_STEP_REGISTRY: dict[str, Callable] = {
+_STEP_REGISTRY: dict[str, StepCallable] = {
     "drop_nulls": cleaning.drop_nulls,
     "drop_columns": cleaning.drop_columns,
     "select_columns": cleaning.select_columns,
@@ -50,7 +54,7 @@ _STEP_REGISTRY: dict[str, Callable] = {
 
 _REGISTRY_LOCK = Lock()
 _DEPRECATED_STEP_ALIASES: dict[str, str] = {}
-_PYTHON_STEP_REGISTRY: dict[str, Callable] = {
+_PYTHON_STEP_REGISTRY: dict[str, StepCallable] = {
     "standardize_missing_tokens": cleaning.standardize_missing_tokens,
     "coalesce_columns": cleaning.coalesce_columns,
 }
@@ -66,7 +70,7 @@ class PipelineContext:
     dry_run: bool
 
 
-def _is_builtin_python_step(name: str, fn: Callable) -> bool:
+def _is_builtin_python_step(name: str, fn: StepCallable) -> bool:
     """Return True when a Python-registered step is part of Arnio core."""
     return getattr(fn, "__module__", "").startswith("arnio.cleaning") or (
         name == "standardize_missing_tokens"
@@ -74,8 +78,8 @@ def _is_builtin_python_step(name: str, fn: Callable) -> bool:
 
 
 def _get_builtin_step_registry(
-    python_step_registry: dict[str, Callable],
-) -> dict[str, Callable]:
+    python_step_registry: dict[str, StepCallable],
+) -> dict[str, StepCallable]:
     """Return all built-in pipeline steps, including Python-backed ones."""
     builtin_steps = dict(_STEP_REGISTRY)
     builtin_steps.update(
@@ -89,7 +93,7 @@ def _get_builtin_step_registry(
 
 
 def _get_namespaced_builtin_steps(
-    python_step_registry: dict[str, Callable],
+    python_step_registry: dict[str, StepCallable],
 ) -> dict[str, str]:
     """Map namespaced built-in step names to canonical step names."""
     return {
@@ -98,14 +102,14 @@ def _get_namespaced_builtin_steps(
     }
 
 
-def register_step(name: str, fn: Callable, overwrite: bool = False):
+def register_step(name: str, fn: StepCallable, overwrite: bool = False) -> None:
     """Register a custom Python pipeline step.
 
     Parameters
     ----------
     name : str
         Name of the step for use in pipelines.
-    fn : Callable
+    fn : StepCallable
         Function to call for this step. Should accept (df, **kwargs) and return modified df.
     overwrite : bool, default False
         If True, allows replacing an existing custom Python step with the same name.
@@ -225,8 +229,8 @@ def _resolve_step_name(name: str, deprecated_step_aliases: dict[str, str]) -> st
 
 
 def _validate_pipeline_steps(
-    steps: list[tuple],
-    python_step_registry: dict[str, Callable],
+    steps: list[StepSpec],
+    python_step_registry: dict[str, StepCallable],
     deprecated_step_aliases: dict[str, str],
 ) -> None:
     """Validate pipeline steps before execution begins."""
@@ -265,7 +269,7 @@ def _validate_pipeline_steps(
 
 def pipeline(
     frame: ArFrame,
-    steps: list[tuple],
+    steps: list[StepSpec],
     *,
     return_metadata: bool = False,
     dry_run: bool = False,
@@ -281,7 +285,7 @@ def pipeline(
     ----------
     frame : ArFrame
         Input data frame.
-    steps : list[tuple]
+    steps : list[StepSpec]
         List of steps to apply. Each step is (name,) or (name, kwargs).
     return_metadata : bool, default False
         When True, also return a metadata dictionary with per-step timing
